@@ -1,7 +1,7 @@
 use std::io;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -54,37 +54,51 @@ fn run_app(
         terminal.draw(|frame| ui::draw(frame, app))?;
 
         if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => {
-                            if app.input_mode != InputMode::Editing {
+            match event::read()? {
+                Event::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                        match key.code {
+                            KeyCode::Esc => {
                                 return Ok(());
                             }
-                        }
-                        KeyCode::Char('e') => {
-                            if app.input_mode == InputMode::Normal {
-                                app.input_mode = InputMode::Editing;
+                            KeyCode::Enter => {
+                                if !app.input.is_empty() {
+                                    // Check for /exit command
+                                    if app.input.trim() == "/exit" {
+                                        return Ok(());
+                                    }
+                                    app.send_command();
+                                }
                             }
-                        }
-                        KeyCode::Enter => {
-                            if app.input_mode == InputMode::Editing && !app.input.is_empty() {
-                                app.send_command();
-                            }
-                        }
-                        KeyCode::Backspace => {
-                            if app.input_mode == InputMode::Editing {
+                            KeyCode::Backspace => {
                                 app.input.pop();
                             }
-                        }
-                        KeyCode::Char(c) => {
-                            if app.input_mode == InputMode::Editing {
+                            KeyCode::Char(c) => {
                                 app.input.push(c);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Event::Mouse(mouse_event) => {
+                    match mouse_event.kind {
+                        MouseEventKind::ScrollUp => {
+                            // Scroll up: decrease scroll_offset
+                            if app.scroll_offset > 0 {
+                                app.scroll_offset -= 1;
+                            }
+                        }
+                        MouseEventKind::ScrollDown => {
+                            // Scroll down: increase scroll_offset
+                            let max_scroll = app.messages.len().saturating_sub(1) as u16;
+                            if app.scroll_offset < max_scroll {
+                                app.scroll_offset += 1;
                             }
                         }
                         _ => {}
                     }
                 }
+                _ => {}
             }
         }
 
@@ -94,12 +108,6 @@ fn run_app(
 }
 
 use std::time::Duration;
-
-#[derive(Debug, Clone, PartialEq)]
-enum InputMode {
-    Normal,
-    Editing,
-}
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -111,11 +119,11 @@ enum Message {
 
 struct App {
     input: String,
-    input_mode: InputMode,
     messages: Vec<Message>,
     agent: Agent,
     cursor_position: usize,
     thinking: bool,
+    scroll_offset: u16,
 }
 
 impl App {
@@ -123,14 +131,14 @@ impl App {
         let agent = Agent::new();
         Self {
             input: String::new(),
-            input_mode: InputMode::Normal,
             messages: vec![
-                Message::System("Welcome to NULLCODE! Press 'e' to edit, 'q' to quit.".to_string()),
-                Message::System("Type your command and press Enter to send.".to_string()),
+                Message::System("Welcome to NULCODE! Type your command and press Enter.".to_string()),
+                Message::System("Type '/exit' or press Esc to quit.".to_string()),
             ],
             agent,
             cursor_position: 0,
             thinking: false,
+            scroll_offset: 0,
         }
     }
 
@@ -146,20 +154,28 @@ impl App {
     }
 
     fn process_messages(&mut self) {
+        let mut has_new = false;
         while let Ok(msg) = self.agent.receiver.try_recv() {
             match msg {
                 AgentMessage::Response(response) => {
                     self.messages.push(Message::Agent(response));
                     self.thinking = false;
+                    has_new = true;
                 }
                 AgentMessage::Error(error) => {
                     self.messages.push(Message::Error(error));
                     self.thinking = false;
+                    has_new = true;
                 }
                 AgentMessage::Status(status) => {
                     self.messages.push(Message::System(status));
+                    has_new = true;
                 }
             }
+        }
+        // Auto-scroll to bottom when new messages arrive
+        if has_new {
+            self.scroll_offset = self.messages.len().saturating_sub(1) as u16;
         }
     }
 }

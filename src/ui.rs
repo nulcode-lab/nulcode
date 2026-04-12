@@ -2,11 +2,11 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    text::{Line, Span, Text},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
-use crate::{App, InputMode, Message};
+use crate::{App, Message};
 
 pub fn draw(frame: &mut Frame, app: &App) {
     let chunks = Layout::default()
@@ -24,7 +24,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     // Title
     let title = Paragraph::new(Span::styled(
-        "NULLCODE",
+        "NULCODE",
         Style::default()
             .fg(Color::Cyan)
             .add_modifier(Modifier::BOLD),
@@ -34,63 +34,58 @@ pub fn draw(frame: &mut Frame, app: &App) {
     frame.render_widget(title, chunks[0]);
 
     // Messages
-    let messages: Vec<ListItem> = app
+    let messages: Vec<Line> = app
         .messages
         .iter()
-        .map(|msg| create_message_item(msg))
+        .flat_map(|msg| create_message_lines(msg))
         .collect();
 
-    let messages_list = List::new(messages)
+    let messages_text = Text::from(messages);
+    let messages_widget = Paragraph::new(messages_text)
         .block(Block::default().borders(Borders::ALL).title("Messages"))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
-    frame.render_widget(messages_list, chunks[1]);
+        .wrap(Wrap { trim: true })
+        .scroll((app.scroll_offset, 0));
+    frame.render_widget(messages_widget, chunks[1]);
 
     // Input
     let input = create_input_widget(app);
     frame.render_widget(input, chunks[2]);
 
-    // Set cursor position
-    if app.input_mode == InputMode::Editing {
-        frame.set_cursor_position((
-            chunks[2].x + app.cursor_position as u16 + 1,
-            chunks[2].y + 1,
-        ));
-    }
+    // Set cursor position (always in input mode)
+    frame.set_cursor_position((
+        chunks[2].x + app.cursor_position as u16 + 1,
+        chunks[2].y + 1,
+    ));
 }
 
-fn create_message_item(msg: &Message) -> ListItem {
-    match msg {
-        Message::User(text) => ListItem::new(Line::from(vec![
-            Span::styled("You: ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-            Span::raw(text),
-        ])),
-        Message::Agent(text) => ListItem::new(Line::from(vec![
-            Span::styled("Agent: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::raw(text),
-        ])),
-        Message::System(text) => ListItem::new(Line::from(vec![
-            Span::styled("System: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::raw(text),
-        ])),
-        Message::Error(text) => ListItem::new(Line::from(vec![
-            Span::styled("Error: ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-            Span::raw(text),
-        ])),
+fn create_message_lines(msg: &Message) -> Vec<Line> {
+    let (prefix, prefix_style) = match msg {
+        Message::User(_) => ("You: ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+        Message::Agent(_) => ("Agent: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Message::System(_) => ("System: ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Message::Error(_) => ("Error: ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+    };
+
+    let text = match msg {
+        Message::User(t) | Message::Agent(t) | Message::System(t) | Message::Error(t) => t.clone(),
+    };
+
+    let mut lines = Vec::new();
+    let full_text = format!("{}{}", prefix, text);
+
+    // Split by newlines first
+    for (i, line) in full_text.split('\n').enumerate() {
+        if i > 0 {
+            lines.push(Line::from(""));
+        }
+        lines.push(Line::from(Span::styled(line.to_string(), prefix_style)));
     }
+
+    lines
 }
 
 fn create_input_widget(app: &App) -> Paragraph {
-    let input_style = match app.input_mode {
-        InputMode::Normal => Style::default().fg(Color::Gray),
-        InputMode::Editing => Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
-    };
-
-    let mode_indicator = match app.input_mode {
-        InputMode::Normal => "NORMAL",
-        InputMode::Editing => "EDIT",
-    };
-
-    let title = format!("Input [{}] - Press 'e' to edit", mode_indicator);
+    let title = "Input - Press Enter to send, Esc to quit";
 
     let thinking_indicator = if app.thinking {
         " [Thinking...]"
@@ -104,6 +99,6 @@ fn create_input_widget(app: &App) -> Paragraph {
                 .borders(Borders::ALL)
                 .title(format!("{}{}", title, thinking_indicator)),
         )
-        .style(input_style)
+        .style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
         .wrap(Wrap { trim: true })
 }

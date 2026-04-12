@@ -65,12 +65,12 @@ impl Agent {
   /clear         - Clear the screen
   /agents        - List available agents
   /tools         - List available tools
+  /exit          - Exit the application
   <query>        - Send a query to the current agent
 
 Navigation:
-  e              - Enter edit mode
-  q / Esc        - Quit (in normal mode)
-  Enter          - Send command (in edit mode)"#
+  Enter          - Send command
+  Esc            - Quit"#
             .to_string()
     }
 
@@ -101,8 +101,8 @@ Navigation:
         // Simulate agent processing a query
         format!(
             "Processing query: \"{}\"\n\n\
-             [NULLCODE Agent Response]\n\
-             This is a simulated response from the NULLCODE Agent.\n\
+             [NULCODE Agent Response]\n\
+             This is a simulated response from the NULCODE Agent.\n\
              In a real implementation, this would connect to an AI model\n\
              to provide intelligent responses to your coding questions.\n\n\
              Query length: {} characters",
