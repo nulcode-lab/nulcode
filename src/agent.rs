@@ -28,10 +28,7 @@ impl Agent {
         }
     }
 
-    fn agent_loop(
-        cmd_rx: mpsc::Receiver<String>,
-        msg_tx: mpsc::Sender<AgentMessage>,
-    ) {
+    fn agent_loop(cmd_rx: mpsc::Receiver<String>, msg_tx: mpsc::Sender<AgentMessage>) {
         loop {
             if let Ok(command) = cmd_rx.recv() {
                 // Process the command

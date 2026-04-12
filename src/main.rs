@@ -1,36 +1,32 @@
 use std::io;
+use std::time::Duration;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseEventKind,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{
-    backend::CrosstermBackend,
-    Terminal,
-};
+use ratatui::{backend::CrosstermBackend, Terminal};
 
 mod agent;
-mod ui;
 mod command;
+mod ui;
 
 use agent::{Agent, AgentMessage};
 
 fn main() -> io::Result<()> {
-    // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Create app state
     let mut app = App::new();
 
-    // Run the app
     let res = run_app(&mut terminal, &mut app);
 
-    // Restore terminal
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -46,10 +42,7 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn run_app(
-    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    app: &mut App,
-) -> io::Result<()> {
+fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App) -> io::Result<()> {
     loop {
         terminal.draw(|frame| ui::draw(frame, app))?;
 
@@ -63,7 +56,6 @@ fn run_app(
                             }
                             KeyCode::Enter => {
                                 if !app.input.is_empty() {
-                                    // Check for /exit command
                                     if app.input.trim() == "/exit" {
                                         return Ok(());
                                     }
@@ -80,34 +72,27 @@ fn run_app(
                         }
                     }
                 }
-                Event::Mouse(mouse_event) => {
-                    match mouse_event.kind {
-                        MouseEventKind::ScrollUp => {
-                            // Scroll up: decrease scroll_offset
-                            if app.scroll_offset > 0 {
-                                app.scroll_offset -= 1;
-                            }
+                Event::Mouse(mouse_event) => match mouse_event.kind {
+                    MouseEventKind::ScrollUp => {
+                        if app.scroll_offset > 0 {
+                            app.scroll_offset -= 1;
                         }
-                        MouseEventKind::ScrollDown => {
-                            // Scroll down: increase scroll_offset
-                            let max_scroll = app.messages.len().saturating_sub(1) as u16;
-                            if app.scroll_offset < max_scroll {
-                                app.scroll_offset += 1;
-                            }
-                        }
-                        _ => {}
                     }
-                }
+                    MouseEventKind::ScrollDown => {
+                        let max_scroll = app.messages.len().saturating_sub(1) as u16;
+                        if app.scroll_offset < max_scroll {
+                            app.scroll_offset += 1;
+                        }
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
         }
 
-        // Process agent messages
         app.process_messages();
     }
 }
-
-use std::time::Duration;
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -131,10 +116,7 @@ impl App {
         let agent = Agent::new();
         Self {
             input: String::new(),
-            messages: vec![
-                Message::System("Welcome to NULCODE! Type your command and press Enter.".to_string()),
-                Message::System("Type '/exit' or press Esc to quit.".to_string()),
-            ],
+            messages: vec![],
             agent,
             cursor_position: 0,
             thinking: false,
@@ -149,7 +131,6 @@ impl App {
         self.cursor_position = 0;
         self.thinking = true;
 
-        // Send command to agent
         self.agent.execute_command(command);
     }
 
@@ -173,7 +154,6 @@ impl App {
                 }
             }
         }
-        // Auto-scroll to bottom when new messages arrive
         if has_new {
             self.scroll_offset = self.messages.len().saturating_sub(1) as u16;
         }

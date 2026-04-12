@@ -19,9 +19,7 @@ impl CommandType {
             Some(&"/clear") => CommandType::Clear,
             Some(&"/agents") => CommandType::Agents,
             Some(&"/tools") => CommandType::Tools,
-            Some(cmd) if cmd.starts_with('/') => {
-                CommandType::Unknown(cmd.to_string())
-            }
+            Some(cmd) if cmd.starts_with('/') => CommandType::Unknown(cmd.to_string()),
             Some(query) => CommandType::Query(query.to_string()),
             None => CommandType::Query(input.to_string()),
         }
