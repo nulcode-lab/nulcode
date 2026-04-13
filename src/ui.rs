@@ -289,7 +289,7 @@ fn create_input_widget(app: &App) -> Paragraph<'_> {
 
 fn draw_menu(frame: &mut Frame, app: &App, input_area: Rect) {
     let filtered = app.filtered_commands();
-    let menu_width = 14u16;
+    let menu_width = 24u16;
     let menu_height = (filtered.len() as u16 + 2).min(10);
     let area = frame.area();
 
@@ -312,7 +312,16 @@ fn draw_menu(frame: &mut Frame, app: &App, input_area: Rect) {
         format!("Menu [{}]", app.menu_filter)
     };
 
-    let items: Vec<ListItem> = filtered.iter().map(|cmd| ListItem::new(*cmd)).collect();
+    let items: Vec<ListItem> = filtered
+        .iter()
+        .map(|(cmd, desc)| {
+            ListItem::new(Line::from(vec![
+                Span::styled(*cmd, Style::default().fg(Color::White)),
+                Span::raw("  "),
+                Span::styled(*desc, Style::default().fg(Color::DarkGray)),
+            ]))
+        })
+        .collect();
 
     let menu = List::new(items)
         .block(

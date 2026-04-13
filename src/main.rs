@@ -87,7 +87,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                                 }
                                 KeyCode::Enter => {
                                     let filtered = app.filtered_commands();
-                                    if let Some(&cmd) = filtered.get(app.menu_selection) {
+                                    if let Some(&(cmd, _)) = filtered.get(app.menu_selection) {
                                         if cmd == "/exit" {
                                             return Ok(());
                                         }
@@ -188,7 +188,7 @@ struct App {
     show_menu: bool,
     menu_selection: usize,
     menu_filter: String,
-    all_commands: Vec<&'static str>,
+    all_commands: Vec<(&'static str, &'static str)>,
 }
 
 fn fuzzy_match(pattern: &str, text: &str) -> bool {
@@ -205,10 +205,10 @@ fn fuzzy_match(pattern: &str, text: &str) -> bool {
 }
 
 impl App {
-    fn filtered_commands(&self) -> Vec<&'static str> {
+    fn filtered_commands(&self) -> Vec<(&'static str, &'static str)> {
         self.all_commands
             .iter()
-            .filter(|cmd| fuzzy_match(&self.menu_filter, cmd))
+            .filter(|(cmd, _)| fuzzy_match(&self.menu_filter, cmd))
             .copied()
             .collect()
     }
@@ -226,7 +226,13 @@ impl App {
             menu_selection: 0,
             menu_filter: String::new(),
             all_commands: vec![
-                "/help", "/status", "/clear", "/agents", "/tools", "/model", "/exit",
+                ("/help", "显示帮助"),
+                ("/status", "显示状态"),
+                ("/clear", "清屏"),
+                ("/agents", "列出代理"),
+                ("/tools", "列出工具"),
+                ("/model", "选择模型"),
+                ("/exit", "退出"),
             ],
         }
     }
