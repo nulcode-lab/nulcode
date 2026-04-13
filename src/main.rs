@@ -226,13 +226,13 @@ impl App {
             menu_selection: 0,
             menu_filter: String::new(),
             all_commands: vec![
-                ("/help", "显示帮助"),
-                ("/status", "显示状态"),
-                ("/clear", "清屏"),
-                ("/agents", "列出代理"),
-                ("/tools", "列出工具"),
-                ("/model", "选择模型"),
-                ("/exit", "退出"),
+                ("/help", "Show help"),
+                ("/status", "Show status"),
+                ("/clear", "Clear screen"),
+                ("/agents", "List agents"),
+                ("/tools", "List tools"),
+                ("/model", "Select model"),
+                ("/exit", "Exit app"),
             ],
         }
     }
