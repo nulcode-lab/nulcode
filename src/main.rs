@@ -50,25 +50,70 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
             match event::read()? {
                 Event::Key(key) => {
                     if key.kind == KeyEventKind::Press {
-                        match key.code {
-                            KeyCode::Esc => {
-                                return Ok(());
-                            }
-                            KeyCode::Enter => {
-                                if !app.input.is_empty() {
-                                    if app.input.trim() == "/exit" {
+                        if app.show_menu {
+                            match key.code {
+                                KeyCode::Up => {
+                                    if app.menu_selection > 0 {
+                                        app.menu_selection -= 1;
+                                    }
+                                }
+                                KeyCode::Down => {
+                                    if app.menu_selection < 1 {
+                                        app.menu_selection += 1;
+                                    }
+                                }
+                                KeyCode::Enter => match app.menu_selection {
+                                    0 => {
+                                        app.show_menu = false;
+                                        app.input = "/model ".to_string();
+                                        app.cursor_position = app.input.len();
+                                    }
+                                    1 => {
                                         return Ok(());
                                     }
-                                    app.send_command();
+                                    _ => {}
+                                },
+                                KeyCode::Esc => {
+                                    app.show_menu = false;
                                 }
+                                _ => {}
                             }
-                            KeyCode::Backspace => {
-                                app.input.pop();
+                        } else {
+                            match key.code {
+                                KeyCode::Char('/') if app.input.is_empty() => {
+                                    app.show_menu = true;
+                                    app.menu_selection = 0;
+                                }
+                                KeyCode::Enter => {
+                                    if !app.input.is_empty() {
+                                        if app.input.trim() == "/exit" {
+                                            return Ok(());
+                                        }
+                                        app.send_command();
+                                    }
+                                }
+                                KeyCode::Backspace => {
+                                    app.input.pop();
+                                    if app.cursor_position > 0 {
+                                        app.cursor_position -= 1;
+                                    }
+                                }
+                                KeyCode::Left => {
+                                    if app.cursor_position > 0 {
+                                        app.cursor_position -= 1;
+                                    }
+                                }
+                                KeyCode::Right => {
+                                    if app.cursor_position < app.input.len() {
+                                        app.cursor_position += 1;
+                                    }
+                                }
+                                KeyCode::Char(c) => {
+                                    app.input.push(c);
+                                    app.cursor_position += 1;
+                                }
+                                _ => {}
                             }
-                            KeyCode::Char(c) => {
-                                app.input.push(c);
-                            }
-                            _ => {}
                         }
                     }
                 }
@@ -109,6 +154,8 @@ struct App {
     cursor_position: usize,
     thinking: bool,
     scroll_offset: u16,
+    show_menu: bool,
+    menu_selection: usize,
 }
 
 impl App {
@@ -121,6 +168,8 @@ impl App {
             cursor_position: 0,
             thinking: false,
             scroll_offset: 0,
+            show_menu: false,
+            menu_selection: 0,
         }
     }
 

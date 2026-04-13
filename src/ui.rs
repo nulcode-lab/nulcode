@@ -1,8 +1,8 @@
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -23,10 +23,17 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     let input = create_input_widget(app);
     frame.render_widget(input, input_chunks[1]);
-    frame.set_cursor_position((
-        input_chunks[1].x + app.cursor_position as u16 + 1,
-        input_chunks[1].y + 1,
-    ));
+
+    if !app.show_menu {
+        frame.set_cursor_position((
+            input_chunks[1].x + app.cursor_position as u16 + 1,
+            input_chunks[1].y + 1,
+        ));
+    }
+
+    if app.show_menu {
+        draw_menu(frame, app, input_chunks[1]);
+    }
 }
 
 fn draw_splash(frame: &mut Frame) {
@@ -169,9 +176,7 @@ fn draw_splash(frame: &mut Frame) {
         )])))
         .collect();
 
-    let splash = Paragraph::new(Text::from(logo_text))
-        .block(Block::default().borders(Borders::ALL))
-        .alignment(Alignment::Center);
+    let splash = Paragraph::new(Text::from(logo_text)).alignment(Alignment::Center);
 
     frame.render_widget(splash, splash_area);
 }
@@ -258,7 +263,7 @@ fn create_message_lines(msg: &Message) -> Vec<Line<'_>> {
 }
 
 fn create_input_widget(app: &App) -> Paragraph<'_> {
-    let title = "Input - Press Enter to send, Esc to quit";
+    let title = "Input - Press Enter to send, / to menu";
 
     let thinking_indicator = if app.thinking { " [Thinking...]" } else { "" };
 
@@ -274,4 +279,49 @@ fn create_input_widget(app: &App) -> Paragraph<'_> {
                 .add_modifier(Modifier::BOLD),
         )
         .wrap(Wrap { trim: true })
+}
+
+fn draw_menu(frame: &mut Frame, app: &App, input_area: Rect) {
+    let menu_width = 12u16;
+    let menu_height = 5u16;
+    let area = frame.area();
+
+    let cursor_x = input_area.x + app.cursor_position as u16 + 1;
+    let cursor_y = input_area.y;
+
+    let menu_x = cursor_x.min(area.width.saturating_sub(menu_width));
+    let menu_y = cursor_y.saturating_sub(menu_height);
+
+    let menu_area = Rect {
+        x: menu_x,
+        y: menu_y,
+        width: menu_width,
+        height: menu_height,
+    };
+
+    let items: Vec<ListItem> = vec![ListItem::new("/model"), ListItem::new("/exit")];
+
+    let menu = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Menu")
+                .title_style(
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+        )
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("▶ ");
+
+    let mut state = ratatui::widgets::ListState::default();
+    state.select(Some(app.menu_selection));
+
+    frame.render_stateful_widget(menu, menu_area, &mut state);
 }
