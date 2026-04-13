@@ -1,4 +1,6 @@
+use std::fs;
 use std::io;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crossterm::{
@@ -16,7 +18,32 @@ mod ui;
 
 use agent::{Agent, AgentMessage};
 
+fn init_config_dir() -> io::Result<PathBuf> {
+    let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".to_string());
+    let config_dir = PathBuf::from(user_profile).join(".nulcode");
+
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)?;
+    }
+
+    let config_file = config_dir.join("nulcode.toml");
+    if !config_file.exists() {
+        let default_config = r#"# NULCODE Configuration
+[model]
+name = "default"
+
+[agent]
+default = "code-assistant"
+"#;
+        fs::write(&config_file, default_config)?;
+    }
+
+    Ok(config_dir)
+}
+
 fn main() -> io::Result<()> {
+    init_config_dir()?;
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
