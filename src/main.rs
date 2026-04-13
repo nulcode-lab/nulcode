@@ -52,29 +52,59 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                     if key.kind == KeyEventKind::Press {
                         if app.show_menu {
                             match key.code {
+                                KeyCode::Char(c) => {
+                                    app.menu_filter.push(c);
+                                    let filtered = app.filtered_commands();
+                                    if filtered.is_empty() {
+                                        app.show_menu = false;
+                                        app.input = format!("/{}", app.menu_filter);
+                                        app.cursor_position = app.input.len();
+                                        app.menu_filter.clear();
+                                    } else {
+                                        app.menu_selection = 0;
+                                    }
+                                }
+                                KeyCode::Backspace => {
+                                    if app.menu_filter.is_empty() {
+                                        app.show_menu = false;
+                                        app.input = "/".to_string();
+                                        app.cursor_position = 1;
+                                    } else {
+                                        app.menu_filter.pop();
+                                        app.menu_selection = 0;
+                                    }
+                                }
                                 KeyCode::Up => {
                                     if app.menu_selection > 0 {
                                         app.menu_selection -= 1;
                                     }
                                 }
                                 KeyCode::Down => {
-                                    if app.menu_selection < 1 {
+                                    let filtered = app.filtered_commands();
+                                    if app.menu_selection + 1 < filtered.len() {
                                         app.menu_selection += 1;
                                     }
                                 }
-                                KeyCode::Enter => match app.menu_selection {
-                                    0 => {
+                                KeyCode::Enter => {
+                                    let filtered = app.filtered_commands();
+                                    if let Some(&cmd) = filtered.get(app.menu_selection) {
+                                        if cmd == "/exit" {
+                                            return Ok(());
+                                        }
                                         app.show_menu = false;
-                                        app.input = "/model ".to_string();
-                                        app.cursor_position = app.input.len();
+                                        app.input.clear();
+                                        app.menu_filter.clear();
+                                        app.cursor_position = 0;
+                                        app.messages.push(Message::User(cmd.to_string()));
+                                        app.thinking = true;
+                                        app.agent.execute_command(cmd.to_string());
                                     }
-                                    1 => {
-                                        return Ok(());
-                                    }
-                                    _ => {}
-                                },
+                                }
                                 KeyCode::Esc => {
                                     app.show_menu = false;
+                                    app.menu_filter.clear();
+                                    app.input.clear();
+                                    app.cursor_position = 0;
                                 }
                                 _ => {}
                             }
@@ -83,6 +113,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                                 KeyCode::Char('/') if app.input.is_empty() => {
                                     app.show_menu = true;
                                     app.menu_selection = 0;
+                                    app.menu_filter.clear();
                                 }
                                 KeyCode::Enter => {
                                     if !app.input.is_empty() {
@@ -156,9 +187,32 @@ struct App {
     scroll_offset: u16,
     show_menu: bool,
     menu_selection: usize,
+    menu_filter: String,
+    all_commands: Vec<&'static str>,
+}
+
+fn fuzzy_match(pattern: &str, text: &str) -> bool {
+    let pattern_chars: Vec<char> = pattern.chars().collect();
+    let text_chars: Vec<char> = text.chars().collect();
+    let mut pattern_idx = 0;
+
+    for ch in text_chars {
+        if pattern_idx < pattern_chars.len() && ch == pattern_chars[pattern_idx] {
+            pattern_idx += 1;
+        }
+    }
+    pattern_idx == pattern_chars.len()
 }
 
 impl App {
+    fn filtered_commands(&self) -> Vec<&'static str> {
+        self.all_commands
+            .iter()
+            .filter(|cmd| fuzzy_match(&self.menu_filter, cmd))
+            .copied()
+            .collect()
+    }
+
     fn new() -> Self {
         let agent = Agent::new();
         Self {
@@ -170,6 +224,10 @@ impl App {
             scroll_offset: 0,
             show_menu: false,
             menu_selection: 0,
+            menu_filter: String::new(),
+            all_commands: vec![
+                "/help", "/status", "/clear", "/agents", "/tools", "/model", "/exit",
+            ],
         }
     }
 

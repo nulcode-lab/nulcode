@@ -267,7 +267,13 @@ fn create_input_widget(app: &App) -> Paragraph<'_> {
 
     let thinking_indicator = if app.thinking { " [Thinking...]" } else { "" };
 
-    Paragraph::new(app.input.as_str())
+    let display_text = if app.show_menu {
+        format!("/{}", app.menu_filter)
+    } else {
+        app.input.clone()
+    };
+
+    Paragraph::new(display_text)
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -282,11 +288,12 @@ fn create_input_widget(app: &App) -> Paragraph<'_> {
 }
 
 fn draw_menu(frame: &mut Frame, app: &App, input_area: Rect) {
-    let menu_width = 12u16;
-    let menu_height = 5u16;
+    let filtered = app.filtered_commands();
+    let menu_width = 14u16;
+    let menu_height = (filtered.len() as u16 + 2).min(10);
     let area = frame.area();
 
-    let cursor_x = input_area.x + app.cursor_position as u16 + 1;
+    let cursor_x = input_area.x + 1;
     let cursor_y = input_area.y;
 
     let menu_x = cursor_x.min(area.width.saturating_sub(menu_width));
@@ -299,13 +306,19 @@ fn draw_menu(frame: &mut Frame, app: &App, input_area: Rect) {
         height: menu_height,
     };
 
-    let items: Vec<ListItem> = vec![ListItem::new("/model"), ListItem::new("/exit")];
+    let title = if app.menu_filter.is_empty() {
+        "Menu".to_string()
+    } else {
+        format!("Menu [{}]", app.menu_filter)
+    };
+
+    let items: Vec<ListItem> = filtered.iter().map(|cmd| ListItem::new(*cmd)).collect();
 
     let menu = List::new(items)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Menu")
+                .title(title)
                 .title_style(
                     Style::default()
                         .fg(Color::Cyan)
